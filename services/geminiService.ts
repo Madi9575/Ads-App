@@ -11,10 +11,7 @@ export const fileToBase64 = (file: File): Promise<string> => {
 };
 
 export const generateImage = async (prompt: string, aspectRatio: AspectRatio, numberOfImages: number = 1): Promise<string[]> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
     try {
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
@@ -39,10 +36,7 @@ export const generateImage = async (prompt: string, aspectRatio: AspectRatio, nu
 };
 
 export const editImage = async (prompt: string, imageFile: File): Promise<string> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
     try {
         const base64Data = await fileToBase64(imageFile);
         const response = await ai.models.generateContent({
@@ -88,10 +82,7 @@ export const generateVideo = async (
     aspectRatio: '16:9' | '9:16', 
     imageFile?: File
 ): Promise<string> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
     try {
         
         let operation;
@@ -119,8 +110,7 @@ export const generateVideo = async (
         const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
         if (!downloadLink) throw new Error("Video generation failed, no URI found.");
         
-        // FIX: Use process.env.API_KEY as per the guidelines.
-        const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+        const response = await fetch(`${downloadLink}&key=${(process.env as any).API_KEY}`);
         const videoBlob = await response.blob();
         return URL.createObjectURL(videoBlob);
     } catch (error) {
@@ -179,12 +169,9 @@ function pcmToWav(pcmData: Uint8Array, sampleRate: number, numChannels: number, 
 }
 
 export const generateSpeech = async (text: string, voiceName: string): Promise<string> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
     if (!text) throw new Error("Le script ne peut pas être vide.");
 
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
     
     try {
         const response = await ai.models.generateContent({
@@ -220,10 +207,7 @@ export const generateSpeech = async (text: string, voiceName: string): Promise<s
 
 
 export const getAdvancedCompetitorAnalysis = async (url: string, sector: string): Promise<AnalysisReport> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
     
     const prompt = `
         Analyze the advertising strategy of the competitor at ${url}, which operates in the ${sector} sector.
@@ -287,10 +271,7 @@ export const getAdvancedCompetitorAnalysis = async (url: string, sector: string)
 };
 
 export const getPredictiveAnalysis = async (prompt: string, mediaType: 'image' | 'video', platform: string): Promise<PredictiveAnalysis> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
     
     const analysisPrompt = `
         Provide a predictive performance analysis for a ${mediaType} ad on ${platform}, based on the creative concept: "${prompt}".
@@ -335,10 +316,7 @@ export const getPredictiveAnalysis = async (prompt: string, mediaType: 'image' |
 };
 
 export const optimizeAdVariations = async (formData: AdCreatorFormData): Promise<AdOptimizationResponse> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
     
     const context = `
         Product: ${formData.productDescription}
@@ -395,10 +373,7 @@ export const optimizeAdVariations = async (formData: AdCreatorFormData): Promise
 };
 
 export const generateCampaignStrategy = async (prompt: string): Promise<AIPilotStrategy> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
     
     const generationPrompt = `
         You are an expert marketing strategist. Based on the user's high-level goal, generate a comprehensive advertising campaign strategy.
@@ -486,10 +461,7 @@ export const generateCampaignStrategy = async (prompt: string): Promise<AIPilotS
 };
 
 export const getAnalyticsInsights = async (dataSummary: string): Promise<AIAnalyticsInsight> => {
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
-    // FIX: Use process.env.API_KEY as per the guidelines.
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: (process.env as any).API_KEY });
 
     const prompt = `
         Analyze the following advertising campaign analytics data summary.

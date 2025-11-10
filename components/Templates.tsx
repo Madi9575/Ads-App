@@ -65,7 +65,6 @@ const mockTemplates: Template[] = [
         stats: { ctrLift: '+28%', uses: 189 },
         parameters: { style: 'Professionnel', performance: 91, objective: 'Leads', tone: 'Expert' },
         adCreatorSettings: {
-            // FIX: Add missing 'lighting' property to the image object.
             image: { prompt: 'Visuel professionnel avec le portrait d\'un expert, le titre du webinaire et la date. Palette de couleurs corporate, design sobre et élégant.', style: 'Graphique', lighting: 'Professionnelle' },
             common: { headline: 'Devenez un expert en 60 minutes.', description: 'Rejoignez notre webinaire gratuit pour maîtriser [Sujet]. Places limitées, réservez la vôtre dès maintenant.', cta: 'Réserver ma place' }
         }
