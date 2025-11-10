@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://kloarwhppeijxemxciwm.supabase.co';
+// FIX: Use process.env for environment variables to resolve TypeScript errors.
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+// FIX: Use process.env for environment variables to resolve TypeScript errors.
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsb2Fyd2hwcGVpanhlbXhjaXdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MDg3MjUsImV4cCI6MjA3ODI4NDcyNX0.D3VgNkqePubxYmdWrXIoIY6lofFQZ7hpxgog-1QM1-8';
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Supabase URL and Anon Key are required.");
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
