@@ -17,7 +17,9 @@ import { View, Campaign, Toast, AIPilotStrategy, GeneratedAd, BudgetInfo, Accoun
 import * as supabaseService from './services/supabaseService';
 import * as geminiService from './services/geminiService';
 import { User } from '@supabase/supabase-js';
+import { supabase } from './services/supabase';
 import { FacebookIcon, GoogleIcon, TikTokIcon, InstagramIcon, LinkedInIcon, ArrowPathIcon } from './components/icons';
+import LoginScreen from './components/LoginScreen';
 
 const App: React.FC = () => {
   // --- STATE MANAGEMENT ---
@@ -25,27 +27,10 @@ const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   
-  // Data state - MOCKED to bypass login
-  const [user, setUser] = useState<User | null>({
-    id: 'mock-user-id-123',
-    email: 'user@publicity.pro',
-    app_metadata: { provider: 'email' },
-    user_metadata: { full_name: 'Mock User' },
-    aud: 'authenticated',
-    created_at: new Date().toISOString(),
-  } as User);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>({
-    id: 'mock-user-id-123',
-    email: 'user@publicity.pro',
-    organizationId: 'mock-org-id-456',
-  });
-  const [organizationData, setOrganizationData] = useState<Organization | null>({
-    id: 'mock-org-id-456',
-    ownerId: 'mock-user-id-123',
-    name: 'PublicityPro Inc.',
-    plan: 'Business Plan',
-    credits: { used: 450, total: 3000 },
-  });
+  // Data state
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [organizationData, setOrganizationData] = useState<Organization | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -69,12 +54,57 @@ const App: React.FC = () => {
     Facebook: FacebookIcon, Google: GoogleIcon, TikTok: TikTokIcon, 
     Instagram: InstagramIcon, LinkedIn: LinkedInIcon
   };
+  
+  // --- AUTH & DATA LISTENER ---
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        setIsLoading(true);
+        const profile = await supabaseService.getUserProfile(currentUser.id);
+        setUserProfile(profile);
+
+        if (profile?.organizationId) {
+          const orgData = await supabaseService.getOrganizationData(profile.organizationId);
+          setOrganizationData(orgData);
+          if (orgData) {
+            await loadAllData(orgData.id);
+          }
+        } else {
+            // Pas d'organisation trouvée, arrêter le chargement
+            setIsLoading(false);
+        }
+      } else {
+        // No user, reset all data states
+        setUserProfile(null);
+        setOrganizationData(null);
+        setCampaigns([]);
+        setAccounts([]);
+        setTeamMembers([]);
+        setAnalysisHistory([]);
+        setStudioFiles([]);
+        setInspirationAds([]);
+        setTemplates([]);
+        setIsLoading(false);
+      }
+    });
+    
+    // Check initial session to avoid flicker
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+            setIsLoading(false);
+        }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   // --- ROBUST USER DATA LOADER ---
   const loadAllData = async (orgId: string) => {
-    setIsLoading(true);
-    // In a real scenario, Supabase calls with a mock ID would fail or return empty.
-    // We will rely on empty states or mock data within components.
     const [
       campaigns, accountsData, teamMembers, analysisHistory, studioFiles, 
       inspirationAds, templates
@@ -98,19 +128,12 @@ const App: React.FC = () => {
     setIsLoading(false);
   };
 
-  // --- DATA LISTENER (replaces auth listener) ---
-  useEffect(() => {
-    if (organizationData) {
-        loadAllData(organizationData.id);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // --- EVENT HANDLERS ---
   const consumeCredits = async (amount: number) => {
     if (organizationData) {
       const newUsed = organizationData.credits.used + amount;
-      setOrganizationData(prev => prev ? { ...prev, credits: { ...prev.credits, used: newUsed } } : null);
+      const updatedOrg = await supabaseService.updateOrganization(organizationData.id, { credits: { ...organizationData.credits, used: newUsed } });
+      if (updatedOrg) setOrganizationData(updatedOrg);
       showToast(`${amount} crédits IA utilisés.`, 'info');
     }
   };
@@ -142,7 +165,12 @@ const App: React.FC = () => {
     showToast("Template appliqué ! Le formulaire a été pré-rempli.", 'info');
   };
 
-  const handleLogout = async () => { showToast("La déconnexion est désactivée.", "info"); };
+  const handleLogout = async () => { 
+      const { error } = await supabaseService.signOutUser();
+      if(error) showToast(error, 'error');
+      else showToast("Vous avez été déconnecté.", 'info');
+  };
+  
   const handleRefreshData = async () => { if (organizationData) await loadAllData(organizationData.id); };
   const handleNavigateToCampaign = (campaignId: string) => { setCurrentView(View.Campaigns); setHighlightedCampaignId(campaignId); };
 
@@ -153,16 +181,8 @@ const App: React.FC = () => {
       for (const ad of launchedAds) {
           for (const platform of platforms) {
               const newCampaignData = { name: ad.variation.headline, platform, status: 'Active' as const, dailyBudget: budget.dailyBudget };
-              const createdCampaign: Campaign = {
-                id: `mock-campaign-${Date.now()}-${Math.random()}`,
-                ...newCampaignData,
-                creationDate: new Date().toISOString(),
-                spent: 0,
-                ctr: 0,
-                conversions: 0,
-                performanceHistory: Array.from({ length: 7 }, (_, i) => ({ day: i + 1, value: Math.random() * 10 })),
-              };
-              createdCampaigns.push(createdCampaign);
+              const createdCampaign = await supabaseService.createCampaign(newCampaignData, organizationData.id);
+              if (createdCampaign) createdCampaigns.push(createdCampaign);
           }
       }
       
@@ -176,23 +196,31 @@ const App: React.FC = () => {
   };
 
   const handleUpdateCampaign = async (campaign: Campaign) => {
-    setCampaigns(campaigns.map(c => c.id === campaign.id ? campaign : c)); 
+    const updated = await supabaseService.updateCampaign(campaign.id, campaign);
+    if(updated) setCampaigns(campaigns.map(c => c.id === campaign.id ? updated : c)); 
     showToast("Campagne mise à jour.", "success");
   };
 
   const handleDeleteCampaign = async (campaignId: string) => {
-    setCampaigns(prev => prev.filter(c => c.id !== campaignId)); 
-    showToast("Campagne supprimée.", "success");
+    const { error } = await supabaseService.deleteCampaign(campaignId);
+    if(!error) {
+        setCampaigns(prev => prev.filter(c => c.id !== campaignId)); 
+        showToast("Campagne supprimée.", "success");
+    } else {
+        showToast(error, 'error');
+    }
   };
   
   const handleUpdateAccount = async (platform: AccountPlatform, status: AccountStatus) => {
     if(!organizationData) return;
-    setAccounts(prev => prev.map(acc => acc.name === platform ? {...acc, status, Icon: platformIcons[platform]} : acc));
+    const updated = await supabaseService.updateAccountStatus(organizationData.id, platform, status);
+    if(updated) setAccounts(prev => prev.map(acc => acc.name === platform ? {...acc, status, Icon: platformIcons[platform]} : acc));
   };
 
   const handleSetUserPlan = async (plan: Organization['plan']) => {
     if(!organizationData) return;
-    setOrganizationData(prev => prev ? { ...prev, plan } : null);
+    const updated = await supabaseService.updateOrganization(organizationData.id, { plan });
+    if(updated) setOrganizationData(updated);
   };
 
   const handleAddAnalysis = async (report: AnalysisReport, url: string, sector: string): Promise<AnalysisHistoryItem | null> => {
@@ -200,12 +228,12 @@ const App: React.FC = () => {
         showToast("Impossible d'enregistrer l'analyse.", 'error');
         return null;
     }
-    const newHistoryItem: AnalysisHistoryItem = {
-      id: `mock-analysis-${Date.now()}`,
-      url, sector, ...report
-    };
-    setAnalysisHistory(prev => [newHistoryItem, ...prev]);
-    return newHistoryItem;
+    const newHistoryItem = await supabaseService.createAnalysisHistory(report, url, sector, organizationData.id);
+    if (newHistoryItem) {
+        setAnalysisHistory(prev => [newHistoryItem, ...prev]);
+        return newHistoryItem;
+    }
+    return null;
   };
 
   // --- RENDER LOGIC ---
@@ -213,9 +241,18 @@ const App: React.FC = () => {
     return <div className="flex h-screen w-full items-center justify-center"><ArrowPathIcon className="w-12 h-12 text-light-accent animate-spin" /></div>;
   }
 
-  if (!user || !userProfile || !organizationData) {
-      // This should not be reached with the mocked data
-      return <div>Erreur de configuration. Impossible de charger l'application.</div>;
+  if (!user) {
+      return <LoginScreen showToast={showToast} />;
+  }
+
+  if (!organizationData) {
+      return <div className="flex h-screen w-full items-center justify-center text-center p-4">
+          <div>
+              <h2 className="text-2xl font-bold">Organisation non trouvée</h2>
+              <p className="text-light-text-secondary mt-2">Nous n'avons pas pu charger les données de votre organisation. Cela peut se produire si l'inscription n'est pas finalisée.</p>
+              <button onClick={handleLogout} className="mt-4 bg-light-accent text-white font-semibold py-2 px-4 rounded-btn">Se déconnecter</button>
+          </div>
+      </div>;
   }
 
   const renderCurrentView = () => {
@@ -229,7 +266,8 @@ const App: React.FC = () => {
       case View.Inspiration: return <Inspiration onApplyTemplate={handleApplyTemplate} />;
       case View.CreativeStudio: return <CreativeStudio showToast={showToast} />;
       case View.OptimisationIA: return <Optimisation />;
-      case View.AccountManagement: return <AccountManagement accounts={accounts} onUpdateAccount={handleUpdateAccount} setCurrentView={setCurrentView} showToast={showToast} businessInfo={{ name: organizationData.name, category: 'E-commerce', email: userProfile.email, phone: '0102030405', website: 'mon-site.com' }} />;
+      case View.AccountManagement: return <AccountManagement accounts={accounts} onUpdateAccount={handleUpdateAccount} setCurrentView={setCurrentView} showToast={showToast} businessInfo={{ name: organizationData.name, category: 'E-commerce', email: userProfile?.email || '', phone: '0102030405', website: 'mon-site.com' }} />;
+      // FIX: Corrected typo from `setMembers` to `setTeamMembers` to match the state setter function.
       case View.Team: return <Team members={teamMembers} setMembers={setTeamMembers} showToast={showToast} />;
       case View.Billing: return <Billing currentPlan={organizationData.plan} setUserPlan={handleSetUserPlan} showToast={showToast}/>;
       default: return <Dashboard onApplyRecommendation={() => {}} onNavigateToCampaign={handleNavigateToCampaign} onGenerateStrategy={handleGenerateStrategy} isGeneratingStrategy={isGeneratingStrategy} campaigns={campaigns}/>;
@@ -245,7 +283,7 @@ const App: React.FC = () => {
         creditsUsed={organizationData.credits.used} 
         creditsTotal={organizationData.credits.total} 
         userPlan={organizationData.plan} 
-        userEmail={userProfile.email}
+        userEmail={userProfile?.email || ''}
         showToast={showToast}
         isSidebarCollapsed={isSidebarCollapsed}
         setIsSidebarCollapsed={setIsSidebarCollapsed}

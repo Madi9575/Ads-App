@@ -6,43 +6,6 @@ import { AuthError } from '@supabase/supabase-js';
 
 const generatePerformanceHistory = () => Array.from({ length: 7 }, (_, i) => ({ day: i + 1, value: Math.random() * 50 + 10 + i * 5 }));
 
-// --- MOCK DATA (to fix Supabase auth/RLS errors in dev/demo environment) ---
-
-const mockStudioFiles: StudioFile[] = [
-    { id: '1', name: 'produit-lancement.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=2070', size: 2300000, tags: ['produit', 'casque', 'ecommerce'], createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: '2', name: 'video-promo.mp4', type: 'video', url: 'https://videos.pexels.com/video-files/3214539/3214539-sd_640_360_30fps.mp4', size: 12500000, tags: ['promo', 'saas', 'interface'], createdAt: new Date(Date.now() - 172800000).toISOString() },
-];
-
-const mockTeam: TeamMember[] = [
-    { id: 'tm1', name: 'Alice Durand', email: 'alice@publicity.pro', role: 'Admin', status: 'Actif', lastActivity: 'Il y a 2 heures', tags: ['Summer Sale', 'Q3 Campaigns'] },
-    { id: 'tm2', name: 'Bob Martin', email: 'bob@publicity.pro', role: 'Éditeur', status: 'Actif', lastActivity: 'Hier', tags: ['TikTok UGC'] },
-    { id: 'tm3', name: 'Carla Rossi', email: 'carla@publicity.pro', role: 'Analyste', status: 'En attente', lastActivity: 'Invit. envoyée il y a 3 jours' },
-    { id: 'tm4', name: 'David Chen', email: 'david@publicity.pro', role: 'Analyste', status: 'Actif', lastActivity: 'Il y a 5 heures', tags: ['Google Ads', 'Reporting'] },
-];
-
-const mockHistory: AnalysisHistoryItem[] = [
-    {
-        id: 'ah1', url: 'nike.com', sector: 'E-commerce', competitorName: 'Nike', avgCtr: 7.8,
-        estBudget: { min: 500000, max: 1000000, details: 'Forte présence sur tous les canaux' },
-        report: {
-            strengths: ['Notoriété de marque massive', 'Campagnes émotionnelles puissantes', 'Utilisation de célébrités'],
-            opportunities: ['Cibler des niches sportives spécifiques', 'Mettre en avant la durabilité', 'Publicités comparatives sur la technologie'],
-            recommendations: ['Lancer une campagne UGC locale', 'Créer du contenu sur les "coulisses"', 'Collaborer avec des micro-influenceurs'],
-            benchmarks: { 'CTR moyen E-commerce': '2.5%', 'ROAS moyen': '4.0x' }
-        }
-    },
-    {
-        id: 'ah2', url: 'hubspot.com', sector: 'SaaS', competitorName: 'HubSpot', avgCtr: 4.2,
-        estBudget: { min: 200000, max: 400000, details: 'Marketing de contenu et SEA très développés' },
-        report: {
-            strengths: ['Contenu éducatif de haute qualité (blog, academy)', 'Outils gratuits en lead magnet', 'SEO dominant'],
-            opportunities: ['Cibler les PME avec une offre plus simple', 'Mettre en avant un support client plus réactif', 'Publicité sur des plateformes alternatives comme Quora/Reddit'],
-            recommendations: ['Créer un outil gratuit simple', 'Lancer une campagne de comparaison de fonctionnalités', 'Faire des webinaires sur des sujets de niche'],
-            benchmarks: { 'CPL moyen SaaS': '45€', 'Taux de conversion MQL > SQL': '15%' }
-        }
-    }
-];
-
 const getSupabaseAuthErrorMessage = (error: AuthError): string => {
     if (error.message.includes('Invalid login credentials')) {
         return "L'adresse e-mail ou le mot de passe est incorrect.";
@@ -137,15 +100,28 @@ export const updateOrganization = async (orgId: string, updates: Partial<Organiz
 // --- CAMPAIGNS ---
 
 export const getCampaignsForOrg = async (orgId: string): Promise<Campaign[]> => {
-    // Mocked data to prevent Supabase errors due to RLS/auth issues in the demo environment.
-    const mockCampaigns: Campaign[] = [
-        { id: 'fb001', name: 'Promo Flash - Été 2024', creationDate: '2024-07-15T10:00:00Z', platform: 'Facebook', status: 'Active', dailyBudget: 100, spent: 1520, ctr: 8.2, conversions: 75, performanceHistory: generatePerformanceHistory() },
-        { id: 'gg001', name: 'Search Campaign Q3', creationDate: '2024-07-01T10:00:00Z', platform: 'Google', status: 'Active', dailyBudget: 250, spent: 4500, ctr: 12.5, conversions: 120, performanceHistory: generatePerformanceHistory() },
-        { id: 'tk001', name: 'Challenge #SummerVibes', creationDate: '2024-06-20T10:00:00Z', platform: 'TikTok', status: 'Paused', dailyBudget: 50, spent: 850, ctr: 15.1, conversions: 210, performanceHistory: generatePerformanceHistory() },
-        { id: 'ig001', name: 'Nouvelle Collection - Influenceurs', creationDate: '2024-05-10T10:00:00Z', platform: 'Instagram', status: 'Ended', dailyBudget: 150, spent: 3150, ctr: 6.8, conversions: 95, performanceHistory: generatePerformanceHistory() },
-        { id: 'li001', name: 'Lead Gen B2B - SaaS', creationDate: '2024-07-18T10:00:00Z', platform: 'LinkedIn', status: 'Active', dailyBudget: 120, spent: 980, ctr: 2.1, conversions: 15, performanceHistory: generatePerformanceHistory() },
-    ];
-    return Promise.resolve(mockCampaigns);
+    const { data, error } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching campaigns:', error);
+        return [];
+    }
+    return data.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        creationDate: c.created_at,
+        platform: c.platform,
+        status: c.status,
+        dailyBudget: c.daily_budget,
+        spent: c.spent,
+        ctr: c.ctr,
+        conversions: c.conversions,
+        performanceHistory: generatePerformanceHistory() // Placeholder as there's no performance data table
+    }));
 };
 
 export const createCampaign = async (campaignData: Partial<Campaign>, orgId: string): Promise<Campaign | null> => {
@@ -185,24 +161,37 @@ export const deleteCampaign = async (campaignId: string): Promise<{ error: strin
 
 // --- ACCOUNTS (AccountManagement) ---
 export const getAccounts = async (orgId: string): Promise<Pick<Account, 'name' | 'status'>[]> => {
-    // Mocked data to prevent Supabase errors.
-    const allPlatforms: AccountPlatform[] = ['Facebook', 'Google', 'TikTok', 'Instagram', 'LinkedIn'];
-    const mockAccounts = [
-        { name: 'Facebook', status: 'Connected' },
-        { name: 'Google', status: 'Connected' },
-        { name: 'TikTok', status: 'Pending' },
-        { name: 'Instagram', status: 'Not Configured' },
-        { name: 'LinkedIn', status: 'Not Configured' },
-    ];
-    // Ensure all platforms are represented
-    const existingPlatforms = new Set(mockAccounts.map(a => a.name));
-    allPlatforms.forEach(p => {
-        if (!existingPlatforms.has(p)) {
-            mockAccounts.push({ name: p, status: 'Not Configured' });
-        }
-    });
+    const { data, error } = await supabase
+        .from('accounts')
+        .select('name, status')
+        .eq('organization_id', orgId);
 
-    return Promise.resolve(mockAccounts as Pick<Account, 'name' | 'status'>[]);
+    if (error) {
+        console.error('Error fetching accounts:', error);
+        const allPlatforms: AccountPlatform[] = ['Facebook', 'Google', 'TikTok', 'Instagram', 'LinkedIn'];
+        return allPlatforms.map(p => ({ name: p, status: 'Not Configured' }));
+    }
+
+    const allPlatforms: AccountPlatform[] = ['Facebook', 'Google', 'TikTok', 'Instagram', 'LinkedIn'];
+    const existingAccounts = new Map(data.map(acc => [acc.name, acc.status]));
+    const accountsToUpsert = allPlatforms
+        .filter(p => !existingAccounts.has(p))
+        .map(p => ({ organization_id: orgId, name: p, status: 'Not Configured' }));
+
+    if (accountsToUpsert.length > 0) {
+        const { error: upsertError } = await supabase.from('accounts').upsert(accountsToUpsert);
+        if (upsertError) {
+            console.error('Error fetching accounts, ensuring defaults:', upsertError);
+        } else {
+            accountsToUpsert.forEach(acc => existingAccounts.set(acc.name, acc.status as AccountStatus));
+        }
+    }
+    
+    return allPlatforms.map(p => ({
+        name: p,
+        // FIX: Add type assertion to ensure the status from the map is treated as AccountStatus.
+        status: (existingAccounts.get(p) as AccountStatus) || 'Not Configured'
+    }));
 };
 
 export const updateAccountStatus = async (orgId: string, platform: AccountPlatform, status: AccountStatus): Promise<Account | null> => {
@@ -214,15 +203,48 @@ export const updateAccountStatus = async (orgId: string, platform: AccountPlatfo
 
 // --- TEAM MEMBERS ---
 export const getTeamMembers = async (orgId: string): Promise<TeamMember[]> => {
-    // Mocked data to prevent Supabase errors.
-    return Promise.resolve(mockTeam);
+    const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('organization_id', orgId);
+    
+    if (error) {
+        console.error('Error fetching team members:', error);
+        return [];
+    }
+    return data.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        role: m.role,
+        status: m.status,
+        lastActivity: m.last_activity,
+        tags: m.tags || []
+    }));
 };
 
 
 // --- COMPETITOR ANALYSIS ---
 export const getAnalysisHistory = async (orgId: string): Promise<AnalysisHistoryItem[]> => {
-    // Mocked data to prevent Supabase errors.
-    return Promise.resolve(mockHistory);
+    const { data, error } = await supabase
+        .from('analysis_history')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching analysis history:', error);
+        return [];
+    }
+    return data.map((item: any) => ({
+        id: item.id,
+        url: item.url,
+        sector: item.sector,
+        competitorName: item.competitor_name,
+        avgCtr: item.avg_ctr,
+        estBudget: item.est_budget,
+        report: item.report
+    }));
 };
 
 export const createAnalysisHistory = async (report: AnalysisReport, url: string, sector: string, orgId: string): Promise<AnalysisHistoryItem | null> => {
@@ -238,8 +260,17 @@ export const createAnalysisHistory = async (report: AnalysisReport, url: string,
 
 // --- CREATIVE STUDIO ---
 export const getStudioFiles = async (orgId: string): Promise<StudioFile[]> => {
-    // Mocked data to prevent Supabase errors.
-    return Promise.resolve(mockStudioFiles);
+    const { data, error } = await supabase
+        .from('studio_files')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching studio files:', error);
+        return [];
+    }
+    return data;
 };
 
 // --- GLOBAL DATA (Inspiration & Templates) ---
